@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/seckill?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com.whu.distributed.seckill: debug
