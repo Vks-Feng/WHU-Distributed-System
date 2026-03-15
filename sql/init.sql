@@ -50,3 +50,26 @@ CREATE TABLE IF NOT EXISTS orders (
     CONSTRAINT fk_order_user FOREIGN KEY (user_id) REFERENCES users(id),
     CONSTRAINT fk_order_product FOREIGN KEY (product_id) REFERENCES products(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 初始化示例商品数据（用于 week2 缓存与压测）
+INSERT INTO products (id, name, price, status, created_at, updated_at)
+VALUES
+    (1, 'iPhone 15 Pro', 7999.00, 'ON_SALE', NOW(), NOW()),
+    (2, 'WHU T-Shirt', 99.00, 'ON_SALE', NOW(), NOW()),
+    (3, 'Mechanical Keyboard', 299.00, 'ON_SALE', NOW(), NOW())
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    price = VALUES(price),
+    status = VALUES(status),
+    updated_at = VALUES(updated_at);
+
+INSERT INTO inventories (product_id, total_stock, available_stock, locked_stock, updated_at)
+VALUES
+    (1, 1000, 1000, 0, NOW()),
+    (2, 5000, 5000, 0, NOW()),
+    (3, 2000, 2000, 0, NOW())
+ON DUPLICATE KEY UPDATE
+    total_stock = VALUES(total_stock),
+    available_stock = VALUES(available_stock),
+    locked_stock = VALUES(locked_stock),
+    updated_at = VALUES(updated_at);
