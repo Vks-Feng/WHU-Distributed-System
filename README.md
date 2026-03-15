@@ -75,7 +75,7 @@ docker compose up --build -d
 - Nginx 入口：`http://localhost:80`
 - 后端实例1：`http://localhost:8081`
 - 后端实例2：`http://localhost:8082`
-- MySQL：`localhost:3306`
+- MySQL：`localhost:3307`
 - Redis：`localhost:6379`
 
 验证负载均衡：
