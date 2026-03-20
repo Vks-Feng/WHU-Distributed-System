@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Duration;
@@ -59,6 +60,7 @@ public class ProductService {
         this.ttlJitterSeconds = ttlJitterSeconds;
     }
 
+    @Transactional(readOnly = true)
     public ProductDetailResponse getById(Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException("invalid product id");
@@ -85,6 +87,7 @@ public class ProductService {
         return product;
     }
 
+    @Transactional(readOnly = true)
     public List<ProductDetailResponse> list(int page, int size) {
         if (page <= 0 || size <= 0 || size > 100) {
             throw new IllegalArgumentException("invalid pagination params");

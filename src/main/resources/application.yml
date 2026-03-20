@@ -2,11 +2,6 @@ server:
   port: ${SERVER_PORT:8080}
 
 spring:
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/seckill?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
-    username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:root}
-    driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
@@ -19,6 +14,17 @@ mybatis:
 
 app:
   instance-id: ${APP_INSTANCE:local}
+  datasource:
+    write:
+      url: ${APP_DATASOURCE_WRITE_URL:${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/seckill?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}}
+      username: ${APP_DATASOURCE_WRITE_USERNAME:${SPRING_DATASOURCE_USERNAME:root}}
+      password: ${APP_DATASOURCE_WRITE_PASSWORD:${SPRING_DATASOURCE_PASSWORD:root}}
+      driver-class-name: ${APP_DATASOURCE_WRITE_DRIVER_CLASS_NAME:${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}}
+    read:
+      url: ${APP_DATASOURCE_READ_URL:${APP_DATASOURCE_WRITE_URL:${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/seckill?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}}}
+      username: ${APP_DATASOURCE_READ_USERNAME:${APP_DATASOURCE_WRITE_USERNAME:${SPRING_DATASOURCE_USERNAME:root}}}
+      password: ${APP_DATASOURCE_READ_PASSWORD:${APP_DATASOURCE_WRITE_PASSWORD:${SPRING_DATASOURCE_PASSWORD:root}}}
+      driver-class-name: ${APP_DATASOURCE_READ_DRIVER_CLASS_NAME:${APP_DATASOURCE_WRITE_DRIVER_CLASS_NAME:${SPRING_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}}}
 
 cache:
   product:

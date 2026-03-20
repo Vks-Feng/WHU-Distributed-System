@@ -15,12 +15,17 @@
   - Nginx 负载均衡（可切换算法）
   - Nginx 动静分离（静态页面 + `/api` 代理）
   - Redis 商品详情缓存（穿透/击穿/雪崩防护）
+- Week3 读写分离：
+  - MySQL 主从复制环境（master/slave）
+  - Spring Boot 双数据源配置（写主库、读从库）
+  - 基于 `@Transactional(readOnly = true)` 的读写路由
+  - 读写路由验证接口与复制状态验证文档
 
 ## 环境要求
 - JDK 17+
 - Maven 3.9+
 - MySQL 8.0+
-- Docker Desktop（用于 week2）
+- Docker Desktop（用于 week2 / week3）
 
 ## 初始化数据库
 1. 启动 MySQL。
@@ -64,7 +69,7 @@ curl http://localhost:8080/api/v1/products/1
 curl "http://localhost:8080/api/v1/products?page=1&size=10"
 ```
 
-## Week2 一键启动（推荐）
+## Week2 / Week3 一键启动（推荐）
 在项目根目录执行：
 
 ```bash
@@ -75,7 +80,8 @@ docker compose up --build -d
 - Nginx 入口：`http://localhost:80`
 - 后端实例1：`http://localhost:8081`
 - 后端实例2：`http://localhost:8082`
-- MySQL：`localhost:3307`
+- MySQL 主库：`localhost:3307`
+- MySQL 从库：`localhost:3308`
 - Redis：`localhost:6379`
 
 验证负载均衡：
@@ -111,20 +117,55 @@ curl http://localhost/api/v1/products/1
 - `cache.product.ttl-jitter-seconds`
 - `cache.product.lock-ttl-seconds`
 
+## Week3 读写分离验证
+应用通过双数据源完成路由：
+- 写请求默认走主库
+- 标注 `@Transactional(readOnly = true)` 的查询走从库
+- 商品查询等可容忍短暂延迟的读请求走从库
+- 用户注册等一致性要求更高的写链路继续走主库
+
+验证接口：
+```bash
+curl http://localhost:8081/api/v1/system/db-route/write
+curl http://localhost:8081/api/v1/system/db-route/read
+```
+
+期望现象：
+- `/write` 返回 `serverId = 1`、`readOnly = 0`
+- `/read` 返回 `serverId = 2`、`readOnly = 1`
+
+主从复制验证：
+```bash
+curl -X POST http://localhost:8081/api/v1/users/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"week3_demo","password":"123456","phone":"13800001111"}'
+
+docker exec seckill-mysql-master mysql -uroot -proot -e "SELECT id, username FROM seckill.users WHERE username='week3_demo';"
+docker exec seckill-mysql-slave mysql -uroot -proot -e "SELECT id, username FROM seckill.users WHERE username='week3_demo';"
+docker exec seckill-mysql-slave sh -lc "printf 'SHOW REPLICA STATUS\\G\n' | mysql -uroot -proot"
+```
+
 ## 目录结构
 ```text
 sec-kill
 ├─ docs/
-│  └─ system-design.md
+│  ├─ system-design.md
+│  ├─ week3-读写分离.md
+│  └─ week3-测试结果.md
+├─ mysql/
+│  └─ replica/
+│     └─ init-replica.sh
 ├─ nginx/
 │  ├─ conf/default.conf.template
 │  └─ html/
 ├─ sql/
-│  └─ init.sql
+│  ├─ init.sql
+│  └─ replication-users.sql
 ├─ src/main/java/com/whu/distributed/seckill/
 │  ├─ common/
 │  ├─ config/
 │  ├─ product/
+│  ├─ system/
 │  └─ user/
 ├─ src/main/resources/
 │  └─ application.yml
@@ -137,4 +178,5 @@ sec-kill
 - 接入 Redis 预减库存与库存回滚
 - 引入消息队列（RabbitMQ/Kafka）实现下单异步化
 - 增加 JWT 鉴权与接口权限控制
+- 接入 ElasticSearch 实现商品搜索（week3 可选项）
 - 将单体拆分为独立微服务（user/product/order/inventory）

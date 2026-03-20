@@ -1,20 +1,74 @@
 services:
-  mysql:
-    image: mysql:8.4
-    container_name: seckill-mysql
+  mysql-master:
+    image: mysql:8.0.41
+    container_name: seckill-mysql-master
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --log-replica-updates=ON
+      - --binlog-expire-logs-seconds=604800
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: seckill
+      MYSQL_ROOT_HOST: "%"
     ports:
       - "3307:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - mysql_master_data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./sql/replication-users.sql:/docker-entrypoint-initdb.d/02-replication-users.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -proot"]
       interval: 10s
       timeout: 5s
       retries: 10
+    networks:
+      - seckill-net
+
+  mysql-slave:
+    image: mysql:8.0.41
+    container_name: seckill-mysql-slave
+    command:
+      - --server-id=2
+      - --relay-log=mysql-relay-bin
+      - --read-only=ON
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --log-replica-updates=ON
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_HOST: "%"
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql_slave_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - seckill-net
+
+  mysql-replica-init:
+    image: mysql:8.0.41
+    container_name: seckill-mysql-replica-init
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MASTER_HOST: mysql-master
+      SLAVE_HOST: mysql-slave
+      MYSQL_REPL_USER: repl
+      MYSQL_REPL_PASSWORD: repl123
+    command: ["sh", "/scripts/init-replica.sh"]
+    volumes:
+      - ./mysql/replica/init-replica.sh:/scripts/init-replica.sh:ro
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      mysql-slave:
+        condition: service_healthy
     networks:
       - seckill-net
 
@@ -39,16 +93,23 @@ services:
     environment:
       SERVER_PORT: 8080
       APP_INSTANCE: app1
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/seckill?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
+      APP_DATASOURCE_WRITE_URL: jdbc:mysql://mysql-master:3306/seckill?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      APP_DATASOURCE_WRITE_USERNAME: seckill_writer
+      APP_DATASOURCE_WRITE_PASSWORD: writer123
+      APP_DATASOURCE_READ_URL: jdbc:mysql://mysql-slave:3306/seckill?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      APP_DATASOURCE_READ_USERNAME: seckill_reader
+      APP_DATASOURCE_READ_PASSWORD: reader123
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
     ports:
       - "8081:8080"
     depends_on:
-      mysql:
+      mysql-master:
         condition: service_healthy
+      mysql-slave:
+        condition: service_healthy
+      mysql-replica-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     networks:
@@ -62,16 +123,23 @@ services:
     environment:
       SERVER_PORT: 8080
       APP_INSTANCE: app2
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/seckill?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
+      APP_DATASOURCE_WRITE_URL: jdbc:mysql://mysql-master:3306/seckill?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      APP_DATASOURCE_WRITE_USERNAME: seckill_writer
+      APP_DATASOURCE_WRITE_PASSWORD: writer123
+      APP_DATASOURCE_READ_URL: jdbc:mysql://mysql-slave:3306/seckill?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      APP_DATASOURCE_READ_USERNAME: seckill_reader
+      APP_DATASOURCE_READ_PASSWORD: reader123
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
     ports:
       - "8082:8080"
     depends_on:
-      mysql:
+      mysql-master:
         condition: service_healthy
+      mysql-slave:
+        condition: service_healthy
+      mysql-replica-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     networks:
@@ -99,7 +167,8 @@ services:
       - seckill-net
 
 volumes:
-  mysql_data:
+  mysql_master_data:
+  mysql_slave_data:
 
 networks:
   seckill-net:

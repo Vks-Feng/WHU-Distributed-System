@@ -8,6 +8,7 @@ import com.whu.distributed.seckill.user.entity.User;
 import com.whu.distributed.seckill.user.mapper.UserMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.UUID;
@@ -23,6 +24,7 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @Transactional
     public UserAuthResponse register(RegisterRequest request) {
         validateRegisterRequest(request);
 
