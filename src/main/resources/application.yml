@@ -2,6 +2,22 @@ server:
   port: ${SERVER_PORT:8080}
 
 spring:
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+    consumer:
+      group-id: ${SPRING_KAFKA_CONSUMER_GROUP:seckill-order-group}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+    admin:
+      fail-fast: false
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
@@ -32,6 +48,13 @@ cache:
     null-ttl-seconds: ${CACHE_PRODUCT_NULL_TTL_SECONDS:60}
     ttl-jitter-seconds: ${CACHE_PRODUCT_TTL_JITTER_SECONDS:120}
     lock-ttl-seconds: ${CACHE_PRODUCT_LOCK_TTL_SECONDS:10}
+
+seckill:
+  topic:
+    order-create: ${SECKILL_TOPIC_ORDER_CREATE:seckill-order-create}
+  kafka-send-timeout-seconds: ${SECKILL_KAFKA_SEND_TIMEOUT_SECONDS:5}
+  order-progress-ttl-hours: ${SECKILL_ORDER_PROGRESS_TTL_HOURS:24}
+  stock-load-lock-seconds: ${SECKILL_STOCK_LOAD_LOCK_SECONDS:5}
 
 logging:
   pattern:
