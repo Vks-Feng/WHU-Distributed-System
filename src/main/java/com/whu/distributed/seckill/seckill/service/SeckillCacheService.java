@@ -135,6 +135,32 @@ public class SeckillCacheService {
         saveProgress(progress);
     }
 
+    public void markPaid(Order order) {
+        OrderProgress progress = new OrderProgress(
+                order.getOrderNo(),
+                order.getUserId(),
+                order.getProductId(),
+                order.getQuantity(),
+                order.getStatus(),
+                "payment completed",
+                order.getCreatedAt()
+        );
+        saveProgress(progress);
+    }
+
+    public void markOrderStatus(Order order, String message) {
+        OrderProgress progress = new OrderProgress(
+                order.getOrderNo(),
+                order.getUserId(),
+                order.getProductId(),
+                order.getQuantity(),
+                order.getStatus(),
+                StringUtils.hasText(message) ? message : order.getStatus(),
+                order.getCreatedAt()
+        );
+        saveProgress(progress);
+    }
+
     public void markFailed(SeckillOrderMessage message, String reason) {
         try {
             OrderProgress progress = new OrderProgress(
@@ -196,6 +222,18 @@ public class SeckillCacheService {
 
     public void cancelReservation(SeckillOrderMessage message, String reason) {
         markFailed(message, reason);
+    }
+
+    public void clearUserOrderMarker(Long userId, Long productId, String orderId) {
+        try {
+            String key = userOrderKey(userId, productId);
+            String current = stringRedisTemplate.opsForValue().get(key);
+            if (orderId.equals(current)) {
+                stringRedisTemplate.delete(key);
+            }
+        } catch (Exception ex) {
+            log.warn("clear user order marker failed, userId={}, productId={}, orderId={}", userId, productId, orderId, ex);
+        }
     }
 
     private void ensureStockLoaded(Long productId) {

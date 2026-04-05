@@ -27,6 +27,11 @@
   - 同一用户同一商品只能秒杀一次
   - 支持按订单 ID、按用户 ID 查询订单
   - 秒杀进度写入 Redis，支持 `PENDING / CREATED / FAILED` 状态查询
+- Week5 分布式事务：
+  - 下单时数据库库存改为“预留锁定”(`available_stock -> locked_stock`)
+  - 支付成功后确认扣减锁定库存，并更新订单状态为 `PAID`
+  - 支付失败时释放锁定库存，并更新订单状态为 `PAY_FAILED`
+  - 基于 Kafka 消息实现“下单 + 库存扣减”“支付 + 订单状态更新”的最终一致性
 
 ## 环境要求
 - JDK 17+
@@ -202,6 +207,46 @@ curl "http://localhost:8081/api/v1/orders?userId=1"
 - Redis 先扣减库存，Kafka 消费后再落库；若异步建单失败，会自动回滚 Redis 库存
 - 数据库层还有 `uk_user_product(user_id, product_id)` 兜底，避免重复下单
 
+## Week5 分布式事务验证
+
+### 1. 发起秒杀请求
+```bash
+curl -X POST http://localhost:8081/api/v1/seckill/orders \
+  -H "Content-Type: application/json" \
+  -d '{"userId":1,"productId":4,"quantity":1}'
+```
+
+### 2. 查询订单状态
+```bash
+curl http://localhost:8081/api/v1/orders/{orderId}
+```
+
+在支付前，期望看到订单状态为 `CREATED`，库存表现为 `available_stock` 减少、`locked_stock` 增加。
+
+### 3. 模拟支付成功
+```bash
+curl -X POST http://localhost:8081/api/v1/payments \
+  -H "Content-Type: application/json" \
+  -d '{"orderId":"287483902004183040","success":true}'
+```
+
+支付成功后：
+- 订单状态更新为 `PAID`
+- `locked_stock` 扣减回 0
+- Redis 进度更新为 `PAID`
+
+### 4. 模拟支付失败
+```bash
+curl -X POST http://localhost:8081/api/v1/payments \
+  -H "Content-Type: application/json" \
+  -d '{"orderId":"287483902004183040","success":false}'
+```
+
+支付失败后：
+- 订单状态更新为 `PAY_FAILED`
+- 库存从 `locked_stock` 释放回 `available_stock`
+- 用户可重新发起同商品秒杀请求
+
 ## 目录结构
 ```text
 sec-kill
@@ -211,6 +256,7 @@ sec-kill
 │  ├─ week3-测试结果.md
 │  ├─ week4-消息队列.md
 │  └─ week4-测试结果.md
+│  └─ week5-分布式事务.md
 ├─ mysql/
 │  └─ replica/
 │     └─ init-replica.sh
@@ -226,6 +272,7 @@ sec-kill
 │  ├─ inventory/
 │  ├─ mq/
 │  ├─ order/
+│  ├─ payment/
 │  ├─ product/
 │  ├─ seckill/
 │  ├─ system/

@@ -16,4 +16,12 @@ public class KafkaTopicConfig {
                 .replicas(1)
                 .build();
     }
+
+    @Bean
+    public NewTopic paymentTopic(@Value("${seckill.topic.payment}") String topicName) {
+        return TopicBuilder.name(topicName)
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
 }

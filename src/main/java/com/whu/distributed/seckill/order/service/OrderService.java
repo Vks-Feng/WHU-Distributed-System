@@ -1,6 +1,7 @@
 package com.whu.distributed.seckill.order.service;
 
 import com.whu.distributed.seckill.inventory.mapper.InventoryMapper;
+import com.whu.distributed.seckill.mq.dto.PaymentMessage;
 import com.whu.distributed.seckill.mq.dto.SeckillOrderMessage;
 import com.whu.distributed.seckill.order.dto.OrderDetailResponse;
 import com.whu.distributed.seckill.order.entity.Order;
@@ -45,7 +46,7 @@ public class OrderService {
             throw new IllegalArgumentException("product not found");
         }
 
-        int updated = inventoryMapper.deductAvailableStock(message.getProductId(), message.getQuantity());
+        int updated = inventoryMapper.reserveStock(message.getProductId(), message.getQuantity());
         if (updated <= 0) {
             throw new IllegalArgumentException("stock not enough");
         }
@@ -59,6 +60,44 @@ public class OrderService {
         order.setStatus("CREATED");
         orderMapper.insert(order);
         return orderMapper.findByOrderNo(message.getOrderId());
+    }
+
+    @Transactional
+    public Order markPaid(PaymentMessage message) {
+        Order order = requireOrder(message.getOrderId());
+        if ("PAID".equalsIgnoreCase(order.getStatus())) {
+            return order;
+        }
+        if (!"CREATED".equalsIgnoreCase(order.getStatus())) {
+            throw new IllegalArgumentException("order status does not support payment, current status=" + order.getStatus());
+        }
+
+        int updatedInventory = inventoryMapper.confirmReservedStock(order.getProductId(), order.getQuantity());
+        if (updatedInventory <= 0) {
+            throw new IllegalStateException("confirm reserved stock failed");
+        }
+
+        orderMapper.updateStatus(order.getOrderNo(), "PAID");
+        return requireOrder(order.getOrderNo());
+    }
+
+    @Transactional
+    public Order markPaymentFailed(PaymentMessage message) {
+        Order order = requireOrder(message.getOrderId());
+        if ("PAY_FAILED".equalsIgnoreCase(order.getStatus()) || "CANCELLED".equalsIgnoreCase(order.getStatus())) {
+            return order;
+        }
+        if ("PAID".equalsIgnoreCase(order.getStatus())) {
+            throw new IllegalArgumentException("order already paid");
+        }
+
+        int updatedInventory = inventoryMapper.releaseReservedStock(order.getProductId(), order.getQuantity());
+        if (updatedInventory <= 0) {
+            throw new IllegalStateException("release reserved stock failed");
+        }
+
+        orderMapper.updateStatus(order.getOrderNo(), "PAY_FAILED");
+        return requireOrder(order.getOrderNo());
     }
 
     public OrderDetailResponse getByOrderId(String orderId) {
@@ -125,5 +164,13 @@ public class OrderService {
                 order.getCreatedAt(),
                 order.getUpdatedAt()
         );
+    }
+
+    private Order requireOrder(String orderId) {
+        Order order = findEntityByOrderId(orderId);
+        if (order == null) {
+            throw new IllegalArgumentException("order not found");
+        }
+        return order;
     }
 }

@@ -25,4 +25,33 @@ public interface InventoryMapper {
               AND available_stock >= #{quantity}
             """)
     int deductAvailableStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
+
+    @Update("""
+            UPDATE inventories
+            SET available_stock = available_stock - #{quantity},
+                locked_stock = locked_stock + #{quantity},
+                updated_at = NOW()
+            WHERE product_id = #{productId}
+              AND available_stock >= #{quantity}
+            """)
+    int reserveStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
+
+    @Update("""
+            UPDATE inventories
+            SET locked_stock = locked_stock - #{quantity},
+                updated_at = NOW()
+            WHERE product_id = #{productId}
+              AND locked_stock >= #{quantity}
+            """)
+    int confirmReservedStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
+
+    @Update("""
+            UPDATE inventories
+            SET available_stock = available_stock + #{quantity},
+                locked_stock = locked_stock - #{quantity},
+                updated_at = NOW()
+            WHERE product_id = #{productId}
+              AND locked_stock >= #{quantity}
+            """)
+    int releaseReservedStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 }
